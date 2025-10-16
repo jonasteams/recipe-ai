@@ -3,7 +3,7 @@ import type { Recipe, Language } from '../types';
 import { GEMINI_MODEL } from '../constants';
 
 // ✅ Fix 1: Use import.meta.env for Vite environment variables
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY || '' });
 
 // Schema for the recipe data (text only)
 const recipeDataSchema = {
@@ -74,7 +74,7 @@ const generateImageForRecipe = async (recipe: Omit<Recipe, 'imageUrl'>): Promise
   if (parts) {
     for (const part of parts) {
       if (part.inlineData) {
-        return part.inlineData.data; // Return base64 image
+return part.inlineData.data || ''; // ✅ Safe fallback to string
       }
     }
   }
