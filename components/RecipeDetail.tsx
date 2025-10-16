@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Recipe, Language, CookMode } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { BackArrowIcon, MinusIcon, PlusIcon, HeartIcon, FilledHeartIcon } from './icons';
+import { BackArrowIcon, MinusIcon, PlusIcon, HeartIcon, FilledHeartIcon, ShareIcon } from './icons';
+import { regenerateRecipeImage } from '../services/geminiService';
+import { Spinner } from './Spinner';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -9,14 +11,24 @@ interface RecipeDetailProps {
   language: Language;
   isFavorite: boolean;
   onToggleFavorite: (recipeName: string) => void;
+  onUpdateRecipe: (updatedRecipe: Recipe) => void;
 }
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=2080&auto=format&fit=crop';
 
 
-export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, language, isFavorite, onToggleFavorite }) => {
+export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, language, isFavorite, onToggleFavorite, onUpdateRecipe }) => {
   const [portions, setPortions] = useState(recipe.servings);
   const [cookMode, setCookMode] = useState<CookMode>('standard');
+  const [showCopied, setShowCopied] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  useEffect(() => {
+    // Reset image error state if recipe image changes (e.g., after successful regeneration)
+    setImageError(false);
+  }, [recipe.imageUrl]);
+
 
   const portionMultiplier = useMemo(() => portions / recipe.servings, [portions, recipe.servings]);
 
@@ -31,38 +43,104 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, lang
     onToggleFavorite(recipe.recipeName);
   };
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    e.currentTarget.src = PLACEHOLDER_IMAGE;
+  const handleShare = async () => {
+    const shareData = {
+      title: recipe.recipeName,
+      text: `${recipe.description}\n\nCheck out this recipe on Recipe AI!`,
+      url: window.location.href,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error("Error sharing:", err);
+      }
+    } else {
+      // Fallback to clipboard
+      const ingredientsText = adjustedIngredients.map(ing => `- ${ing.quantity} ${ing.unit} ${ing.name}`).join('\n');
+      const textToCopy = `${recipe.recipeName}\n\n${TRANSLATIONS[language].ingredients}:\n${ingredientsText}\n\n${recipe.description}`;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setShowCopied(true);
+        setTimeout(() => setShowCopied(false), 2500);
+      });
+    }
   };
 
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  const handleRegenerateImage = async () => {
+    setIsRegenerating(true);
+    try {
+      const newImageUrl = await regenerateRecipeImage(recipe);
+      onUpdateRecipe({ ...recipe, imageUrl: newImageUrl });
+    } catch (error) {
+      console.error("Failed to regenerate image:", error);
+      setImageError(true);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const showRegenerateButton = !recipe.imageUrl || imageError;
+
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="relative">
-            <button onClick={onBack} className="absolute top-4 left-4 flex items-center gap-2 z-10 bg-white/70 backdrop-blur-sm py-2 px-4 rounded-full text-gray-800 hover:bg-white font-semibold transition-colors">
+    <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden relative">
+        <div className="relative w-full h-64 sm:h-80 bg-gray-200">
+            <button onClick={onBack} className="absolute top-4 left-4 flex items-center gap-2 z-20 bg-white/70 backdrop-blur-sm py-2 px-4 rounded-full text-gray-800 hover:bg-white font-semibold transition-colors">
                 <BackArrowIcon />
                 {TRANSLATIONS[language].backButton}
             </button>
             <img
-                src={recipe.imageUrl || PLACEHOLDER_IMAGE}
+                src={showRegenerateButton ? PLACEHOLDER_IMAGE : recipe.imageUrl}
                 alt={recipe.recipeName}
                 onError={handleImageError}
-                className="w-full h-64 sm:h-80 object-cover"
+                className="w-full h-full object-cover"
             />
+             {showRegenerateButton && (
+                <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-40">
+                    <button
+                        onClick={handleRegenerateImage}
+                        disabled={isRegenerating}
+                        className="flex items-center gap-2 bg-orange-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-orange-600 transition-colors disabled:bg-gray-400 disabled:cursor-wait"
+                    >
+                        {isRegenerating ? (
+                            <>
+                                <Spinner />
+                                {TRANSLATIONS[language].regenerating}
+                            </>
+                        ) : (
+                            TRANSLATIONS[language].regenerateImage
+                        )}
+                    </button>
+                </div>
+            )}
         </div>
       <div className="p-6 sm:p-8">
         <div className="mb-8">
-          <div className="flex justify-between items-start gap-4">
-              <h1 className="text-4xl font-bold text-gray-800 mb-2 flex-1">{recipe.recipeName}</h1>
-              <button
-                onClick={handleFavoriteClick}
-                className="flex items-center gap-2 py-2 px-4 rounded-full text-sm font-semibold transition-colors border hover:bg-gray-100"
-                aria-label={isFavorite ? TRANSLATIONS[language].removeFromFavorites : TRANSLATIONS[language].addToFavorites}
-              >
-                {isFavorite
-                  ? <FilledHeartIcon className="w-5 h-5 text-red-500" />
-                  : <HeartIcon className="w-5 h-5 text-gray-600" />}
-                <span>{isFavorite ? TRANSLATIONS[language].favorites : TRANSLATIONS[language].addToFavorites}</span>
-              </button>
+          <div className="flex justify-between items-start gap-4 flex-wrap">
+              <h1 className="text-4xl font-bold text-gray-800 mb-2 flex-1 min-w-[200px]">{recipe.recipeName}</h1>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={handleShare}
+                  className="flex items-center gap-2 py-2 px-4 rounded-full text-sm font-semibold transition-colors border hover:bg-gray-100 text-gray-600"
+                  aria-label={TRANSLATIONS[language].shareRecipe}
+                >
+                  <ShareIcon className="w-5 h-5"/>
+                  <span>{TRANSLATIONS[language].share}</span>
+                </button>
+                <button
+                  onClick={handleFavoriteClick}
+                  className="flex items-center gap-2 py-2 px-4 rounded-full text-sm font-semibold transition-colors border hover:bg-gray-100"
+                  aria-label={isFavorite ? TRANSLATIONS[language].removeFromFavorites : TRANSLATIONS[language].addToFavorites}
+                >
+                  {isFavorite
+                    ? <FilledHeartIcon className="w-5 h-5 text-red-500" />
+                    : <HeartIcon className="w-5 h-5 text-gray-600" />}
+                  <span className={isFavorite ? 'text-red-500' : 'text-gray-600'}>{TRANSLATIONS[language].favorites}</span>
+                </button>
+              </div>
           </div>
           <p className="text-gray-600">{recipe.description}</p>
         </div>
@@ -116,6 +194,11 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, lang
           </div>
         </div>
       </div>
+       {showCopied && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white py-2 px-4 rounded-full text-sm z-20 animate-fade-in-out">
+          {TRANSLATIONS[language].copiedToClipboard}
+        </div>
+      )}
     </div>
   );
 };

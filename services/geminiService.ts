@@ -2,8 +2,6 @@ import { GoogleGenAI, Type, Modality } from '@google/genai';
 import type { Recipe, Language } from '../types';
 import { GEMINI_MODEL } from '../constants';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 // Schema for the recipe data (text only)
 const recipeDataSchema = {
   type: Type.OBJECT,
@@ -47,30 +45,60 @@ const responseSchema = {
   },
 };
 
-// Helper function to generate a single image for a recipe
-const generateImageForRecipe = async (recipe: Omit<Recipe, 'imageUrl'>): Promise<string> => {
-    const imagePrompt = `A professional, vibrant, high-quality photograph of ${recipe.recipeName}. ${recipe.description}. Food photography, delicious, appetizing, centered, well-lit.`;
+const generateImageForRecipeWithRetry = async (
+  recipe: Omit<Recipe, 'imageUrl'>,
+  retries = 3
+): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const imagePrompt = `A delicious and realistic photo of "${recipe.recipeName}". Style: professional food photography, appetizing, high-quality, like photos seen on Pixabay, Unsplash, or Wikimedia Commons. Description for context: ${recipe.description}`;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image', // Image generation model
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
         contents: {
-            parts: [{ text: imagePrompt }],
+          parts: [{ text: imagePrompt }],
         },
         config: {
-            responseModalities: [Modality.IMAGE],
+          responseModalities: [Modality.IMAGE],
         },
-    });
+      });
 
-    for (const part of response.candidates[0].content.parts) {
+      for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
-            return part.inlineData.data; // Return the base64 string
+          const base64ImageBytes: string = part.inlineData.data;
+          return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
         }
+      }
+      throw new Error('Image data not found in Gemini response.');
+    } catch (error) {
+      console.error(`Attempt ${i + 1} failed for generating image for ${recipe.recipeName}:`, error);
+      if (i === retries - 1) {
+        throw error;
+      }
     }
-    throw new Error(`No image data found in response for prompt: ${imagePrompt}`);
+  }
+  throw new Error(`Failed to generate image for ${recipe.recipeName} after ${retries} attempts.`);
 };
+
+
+export const regenerateRecipeImage = async (recipe: Omit<Recipe, 'imageUrl'>): Promise<string> => {
+    try {
+        return await generateImageForRecipeWithRetry(recipe, 1);
+    } catch (error) {
+        console.error('Error regenerating image:', error);
+        if (error instanceof Error) {
+            throw error;
+        }
+        throw new Error('An unknown error occurred while regenerating the image.');
+    }
+};
+
 
 export const fetchRecipes = async (prompt: string, language: Language): Promise<Recipe[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
     // Step 1: Get the text data for all recipes
     const systemInstruction = `You are an expert recipe assistant. Generate recipes in ${language}. Ensure the output strictly follows the provided JSON schema. Do not include markdown formatting like \`\`\`json in your response.`;
     
@@ -100,25 +128,28 @@ export const fetchRecipes = async (prompt: string, language: Language): Promise<
     }
 
     // Step 2: Generate an image for each recipe in parallel
-    const imagePromises = recipesData.map(recipe => 
-        generateImageForRecipe(recipe).catch(error => {
-            console.error(`Failed to generate image for "${recipe.recipeName}":`, error);
-            return ''; // Return an empty string on failure, so the UI can use a placeholder
-        })
+    const imagePromises = recipesData.map(recipe =>
+        generateImageForRecipeWithRetry(recipe)
+            .catch(e => {
+                console.error(`Failed to generate image for ${recipe.recipeName}, will use placeholder.`, e);
+                return ''; // Return empty string on failure
+            })
     );
 
-    const base64Images = await Promise.all(imagePromises);
+    const imageUrls = await Promise.all(imagePromises);
 
-    // Step 3: Combine recipe data with the new, generated images
     const recipesWithImages: Recipe[] = recipesData.map((recipe, index) => ({
         ...recipe,
-        imageUrl: base64Images[index] ? `data:image/png;base64,${base64Images[index]}` : '',
+        imageUrl: imageUrls[index],
     }));
 
     return recipesWithImages;
 
   } catch (error) {
-    console.error('Error fetching recipes or generating images:', error);
-    throw new Error('Could not fetch recipes. Please check your API key and network connection.');
+    console.error('Error fetching recipes:', error);
+    if (error instanceof Error) {
+        throw error;
+    }
+    throw new Error('An unknown error occurred while fetching recipes.');
   }
 };

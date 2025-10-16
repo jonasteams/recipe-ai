@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Language } from '../types';
+import { TRANSLATIONS } from '../constants';
 
 interface HeaderProps {
   language: Language;
@@ -13,19 +14,12 @@ export const Header: React.FC<HeaderProps> = ({ language, setLanguage, onLogoCli
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <button 
           onClick={onLogoClick} 
-          className="cursor-pointer flex items-center gap-3" 
+          className="cursor-pointer" 
           aria-label="Back to homepage"
         >
-          {/* Modern SVG Logo */}
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18.37,9.54a4.34,4.34,0,0,0-4-3.88,4.5,4.5,0,0,0-4.45,4.71,4.2,4.2,0,0,0-1.5,1.1,4.3,4.3,0,0,0-1.12,3.14,4.45,4.45,0,0,0,4.45,4.45h8.3a4.32,4.32,0,0,0,1.44-8.38Z" fill="#FB923C"/>
-            <path d="M12.33,21.61a1,1,0,0,0,1-1V15.39a1.14,1.14,0,0,0-.49-1,1,1,0,0,0-1,0,1.14,1.14,0,0,0-.49,1v5.22a1,1,0,0,0,1,1Z" fill="#F97316"/>
-            <path d="M12.82,14.41a1.14,1.14,0,0,0,.49-1,1.12,1.12,0,0,0-1.12-1.12H5.1a1,1,0,0,0,0,2H11.7a1.12,1.12,0,0,0,1.12-1.12Z" fill="#F97316"/>
-            <path d="M18.89,17.45H12.82a1,1,0,1,0,0,2h6.07a1,1,0,1,0,0-2Z" fill="#F97316"/>
-          </svg>
-          <span className="text-2xl font-bold text-orange-500 tracking-wider">
-            Recipe AI
-          </span>
+          <h1 className="text-3xl font-bold text-orange-500 tracking-wider">
+            {TRANSLATIONS[language].logo}
+          </h1>
         </button>
         <div className="relative">
           <select

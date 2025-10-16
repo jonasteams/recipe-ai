@@ -24,6 +24,11 @@ export const TRANSLATIONS: Record<Language, any> = {
     addToFavorites: "Add to Favorites",
     removeFromFavorites: "Remove from Favorites",
     noFavorites: "You haven't favorited any recipes yet. Click the heart icon on a recipe to save it here!",
+    share: "Share",
+    shareRecipe: "Share Recipe",
+    copiedToClipboard: "Recipe copied to clipboard!",
+    regenerateImage: "Regenerate Image",
+    regenerating: "Regenerating...",
   },
   fr: {
     logo: "RECETTE IA",
@@ -46,6 +51,11 @@ export const TRANSLATIONS: Record<Language, any> = {
     addToFavorites: "Ajouter aux favoris",
     removeFromFavorites: "Retirer des favoris",
     noFavorites: "Vous n'avez pas encore de recettes favorites. Cliquez sur l'icône du cœur sur une recette pour l'enregistrer ici !",
+    share: "Partager",
+    shareRecipe: "Partager la recette",
+    copiedToClipboard: "Recette copiée dans le presse-papiers !",
+    regenerateImage: "Régénérer l'image",
+    regenerating: "Régénération...",
   },
   ar: {
     logo: "وصفة الذكاء الاصطناعي",
@@ -68,5 +78,10 @@ export const TRANSLATIONS: Record<Language, any> = {
     addToFavorites: "إضافة إلى المفضلة",
     removeFromFavorites: "إزالة من المفضلة",
     noFavorites: "لم تقم بتفضيل أي وصفات بعد. انقر على أيقونة القلب على الوصفة لحفظها هنا!",
+    share: "مشاركة",
+    shareRecipe: "مشاركة الوصفة",
+    copiedToClipboard: "تم نسخ الوصفة إلى الحافظة!",
+    regenerateImage: "إعادة إنشاء الصورة",
+    regenerating: "جارٍ الإنشاء...",
   }
 };

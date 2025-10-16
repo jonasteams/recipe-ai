@@ -42,7 +42,9 @@ const App: React.FC = () => {
   const fetchRecipes = useCallback(async (searchTerm: string = '') => {
     setIsLoading(true);
     setError(null);
-    setSelectedRecipe(null);
+    if (!searchTerm) {
+      setSelectedRecipe(null);
+    }
     try {
       const prompt = searchTerm
         ? TRANSLATIONS[language].searchPrompt(searchTerm)
@@ -50,7 +52,8 @@ const App: React.FC = () => {
       const fetchedRecipes = await fetchRecipesFromApi(prompt, language);
       setRecipes(fetchedRecipes);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(errorMessage);
       setRecipes([]);
     } finally {
       setIsLoading(false);
@@ -59,11 +62,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchRecipes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language]);
+  }, [language, fetchRecipes]);
 
   const handleSearch = (searchTerm: string) => {
-    setFilter('all'); // Reset to all recipes on new search
+    setFilter('all');
     fetchRecipes(searchTerm);
   };
   
@@ -71,6 +73,15 @@ const App: React.FC = () => {
     setFilter('all');
     setSelectedRecipe(null);
     fetchRecipes();
+  };
+  
+  const handleUpdateRecipe = (updatedRecipe: Recipe) => {
+    setSelectedRecipe(updatedRecipe);
+    setRecipes(prevRecipes => 
+      prevRecipes.map(r => 
+        r.recipeName === updatedRecipe.recipeName ? updatedRecipe : r
+      )
+    );
   };
 
   const direction = language === 'ar' ? 'rtl' : 'ltr';
@@ -93,6 +104,7 @@ const App: React.FC = () => {
             language={language}
             isFavorite={favorites.includes(selectedRecipe.recipeName)}
             onToggleFavorite={toggleFavorite}
+            onUpdateRecipe={handleUpdateRecipe}
           />
         ) : (
           <>
